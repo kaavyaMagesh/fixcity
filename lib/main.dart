@@ -6,6 +6,11 @@ import 'firebase_options.dart';
 // Screen Imports
 import 'screens/upload_screen.dart';
 import 'screens/admin_screen.dart';
+import 'screens/profile_screen.dart';
+import 'widgets/app_drawer.dart';
+
+// 👇 1. IMPORT THE TRANSLATOR HELPER
+import 'services/translator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,18 +36,14 @@ class FixCityApp extends StatelessWidget {
       // 🎨 THEME: DARK MODE + NEON ORANGE
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212), // Deep Black
-        primaryColor: const Color(0xFFFF6D00), // Safety Orange
-
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        primaryColor: const Color(0xFFFF6D00),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFFFF6D00),
-          secondary: Color(0xFF00E5FF), // Cyan for AI accents
-          surface: Color(0xFF1E1E1E), // Card Background
+          secondary: Color(0xFF00E5FF),
+          surface: Color(0xFF1E1E1E),
         ),
-
         useMaterial3: true,
-
-        // Input Fields Theme
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFF2C2C2C),
@@ -56,8 +57,6 @@ class FixCityApp extends StatelessWidget {
             vertical: 16,
           ),
         ),
-
-        // Buttons Theme
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFFF6D00),
@@ -73,8 +72,6 @@ class FixCityApp extends StatelessWidget {
             ),
           ),
         ),
-
-        // App Bar Theme
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -94,6 +91,7 @@ class FixCityApp extends StatelessWidget {
         '/': (context) => const HomeScreen(),
         '/upload': (context) => const UploadScreen(),
         '/admin': (context) => const AdminScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }
@@ -108,13 +106,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Simulating a Role Switcher
   String _currentRole = "Citizen";
+
+  // 👇 2. FUNCTION TO SWITCH LANGUAGE
+  void _changeLanguage(String langCode) {
+    setState(() {
+      Translator.currentLang = langCode;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 1. TOP BAR with ROLE SWITCHER
+      drawer: const AppDrawer(),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -156,7 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
 
-      // 2. SCROLLABLE BODY
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -167,7 +170,6 @@ class _HomeScreenState extends State<HomeScreen> {
             Center(
               child: Column(
                 children: [
-                  // Logo / Icon
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -181,10 +183,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // App Name
-                  const Text(
-                    "FIXCITY",
-                    style: TextStyle(
+
+                  // 👇 3. TRANSLATED APP TITLE
+                  Text(
+                    Translator.t('app_title'), // "FIXCITY"
+                    style: const TextStyle(
                       fontSize: 42,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.5,
@@ -199,18 +202,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       letterSpacing: 2,
                     ),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // 👇 4. LANGUAGE SELECTOR WIDGET
+                  _buildLanguageSelector(),
                 ],
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
 
-            // --- ILLUSTRATION IMAGE ---
-            // 🖼️ ENSURE 'assets/images/city_view.png' EXISTS!
+            // --- ILLUSTRATION ---
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
-                'assets/images/city_view.png', // <--- Your Local Image
+                'assets/images/city_view.png',
                 height: 150,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -226,12 +233,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 40),
 
-            // --- ACTION BUTTONS (CARDS) ---
-
-            // BUTTON 1: REPORT ISSUE
+            // --- CARDS ---
+            // Report Button
             _buildActionCard(
               context,
-              title: "Report Complaint",
+              title: Translator.t('report_issue'), // 👈 Translated
               description:
                   "Spot a pothole or broken light? Snap a photo and let AI analyze it.",
               icon: Icons.camera_alt_outlined,
@@ -241,32 +247,64 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // BUTTON 2: CITY DASHBOARD
+            // Dashboard Button
             _buildActionCard(
               context,
-              title: "City Dashboard",
+              title: Translator.t('dashboard'), // 👈 Translated
               description:
                   "View live status of complaints (Admin controls hidden for Citizens).",
               icon: Icons.dashboard_outlined,
               color: const Color(0xFF00E5FF),
               onTap: () {
-                // 👇 KEY CHANGE IS HERE: Passing arguments
-                Navigator.pushNamed(
-                  context,
-                  '/admin',
-                  arguments: _currentRole, // <--- Sending "Citizen" or "Admin"
-                );
+                Navigator.pushNamed(context, '/admin', arguments: _currentRole);
               },
             ),
 
-            const SizedBox(height: 40), // Bottom padding for scrolling
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  // Helper Widget to make the buttons look like cool cards
+  // 👇 5. LANGUAGE BUTTON BUILDER
+  Widget _buildLanguageSelector() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _langButton("ENG", "en"),
+        const SizedBox(width: 10),
+        _langButton("தமிழ்", "ta"),
+        const SizedBox(width: 10),
+        _langButton("हिंदी", "hi"),
+      ],
+    );
+  }
+
+  Widget _langButton(String label, String code) {
+    bool isActive = Translator.currentLang == code;
+    return GestureDetector(
+      onTap: () => _changeLanguage(code),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFFF6D00) : Colors.grey.shade800,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? Colors.transparent : Colors.grey.shade700,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionCard(
     BuildContext context, {
     required String title,

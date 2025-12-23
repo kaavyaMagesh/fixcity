@@ -1,8 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart'; // ✅ Required for GPS
-import '../services/data_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+
+// 👇 IMPORT YOUR SERVICES & WIDGETS
+import '../services/ai_service.dart';
+import '../services/translator.dart'; // Import Translator for multilingual support
+import '../widgets/level_up_dialog.dart'; // 👈 Import the Gamification Dialog
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -12,199 +17,261 @@ class UploadScreen extends StatefulWidget {
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  final DataService _dataService = DataService();
-  final TextEditingController _descController = TextEditingController();
-
   File? _imageFile;
-  bool _isUploading = false;
-  Position? _currentPosition; // ✅ Stores the GPS coordinates
-  String _locationStatus = "Getting location...";
+  final TextEditingController _descriptionController = TextEditingController();
+  bool _isLoading = false;
+  Position? _currentPosition;
+  String _locationMessage = "Getting location...";
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation(); // ✅ Auto-fetch on startup
+    _getCurrentLocation();
   }
 
-  // 1. GET GPS LOCATION
+  // 📍 1. Get Location
   Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Check if GPS is enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      setState(() => _locationStatus = "GPS Disabled");
+      setState(() => _locationMessage = "Location services disabled.");
       return;
     }
 
-    // Check Permissions
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        setState(() => _locationStatus = "Location Denied");
+        setState(() => _locationMessage = "Location permission denied.");
         return;
       }
     }
 
-    // Get Coordinates
     Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+        desiredAccuracy: LocationAccuracy.high);
 
     setState(() {
       _currentPosition = position;
-      _locationStatus =
+      _locationMessage =
           "Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}";
     });
   }
 
-  // 2. PICK IMAGE
-  Future<void> _pickImage() async {
+  // 📸 2. Pick Image
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 50,
-    );
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 50);
+
     if (pickedFile != null) {
-      setState(() => _imageFile = File(pickedFile.path));
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
     }
   }
 
-  // 3. SUBMIT REPORT
-  Future<void> _submitReport() async {
-    // Validation
-    if (_imageFile == null || _descController.text.isEmpty) {
+  // 🚀 3. ANALYZE & UPLOAD (GAMIFIED VERSION)
+  Future<void> _analyzeAndUpload() async {
+    if (_imageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Photo and description required")),
+        const SnackBar(content: Text("Please take a photo first!")),
       );
       return;
     }
+    // Note: We allow uploading without location if it fails, using default 0,0
+    double lat = _currentPosition?.latitude ?? 0.0;
+    double lng = _currentPosition?.longitude ?? 0.0;
 
-    if (_currentPosition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Waiting for location...")),
-      );
-      await _getCurrentLocation(); // Retry fetching
-      return;
-    }
-
-    setState(() => _isUploading = true);
+    setState(() => _isLoading = true);
 
     try {
-      // ✅ HERE IS THE FIX YOU NEEDED
-      await _dataService.submitReport(
-        imageFile: _imageFile!,
-        description: _descController.text,
-        lat: _currentPosition!.latitude, // 👈 Passing Lat
-        lng: _currentPosition!.longitude, // 👈 Passing Lng
+      // A. 🤖 AI ANALYSIS (Directly from File Bytes)
+      final imageBytes = await _imageFile!.readAsBytes();
+
+      final analysis = await AIService.analyzeIssue(
+        imageBytes: imageBytes,
+        userText: _descriptionController.text,
+        latitude: lat,
+        longitude: lng,
       );
 
+      // B. 🎮 CALCULATE GAMIFICATION POINTS
+      int points = 20; // Default Low
+      if (analysis.severity.toUpperCase() == 'HIGH') points = 100;
+      else if (analysis.severity.toUpperCase() == 'MEDIUM') points = 50;
+
+      // C. Save to Firestore (Data ONLY, no Image URL)
+      await FirebaseFirestore.instance.collection('reports').add({
+        'imageUrl': "", // 👈 No Cloud Image
+        'description': _descriptionController.text,
+        'location': {'lat': lat, 'lng': lng},
+        'timestamp': FieldValue.serverTimestamp(),
+        'votes': 0,
+
+        // AI RESULTS
+        'aiAnalysis': {
+          'issueType': analysis.issueType,
+          'severity': analysis.severity,
+          'urgency': analysis.urgency,
+          'department': analysis.responsibleDepartment,
+          'summary': analysis.summary,
+          'confidence': analysis.confidence,
+          'status': 'PENDING',
+          'xpEarned': points, // 👈 Saving the points!
+        },
+      });
+
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("✅ Report Submitted!"),
-            backgroundColor: Colors.green,
+        // D. ✨ SHOW LEVEL UP POPUP (Replaces SnackBar)
+        showDialog(
+          context: context,
+          barrierDismissible: false, // Force them to click button
+          builder: (context) => LevelUpDialog(
+            points: points, 
+            severity: analysis.severity
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
-      );
+      print("Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
     } finally {
-      if (mounted) setState(() => _isUploading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("New Report"),
-        backgroundColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(title: Text(Translator.t('report_issue'))), // Translated
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Image Picker
+            // IMAGE PREVIEW
             GestureDetector(
-              onTap: _pickImage,
+              onTap: () => _showPickerOptions(),
               child: Container(
-                height: 200,
-                width: double.infinity,
+                height: 250,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
+                  color: const Color(0xFF2C2C2C),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade800, width: 2),
-                  image: _imageFile != null
-                      ? DecorationImage(
-                          image: FileImage(_imageFile!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
+                  border: Border.all(color: Colors.grey.shade800),
                 ),
                 child: _imageFile == null
-                    ? const Center(
-                        child: Icon(
-                          Icons.add_a_photo,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.camera_alt, size: 50, color: Colors.grey),
+                          const SizedBox(height: 10),
+                          Text(
+                            Translator.t('camera'), // Translated
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                        ],
                       )
-                    : null,
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(_imageFile!, fit: BoxFit.cover),
+                      ),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Location Status
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.5)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.orange),
-                  const SizedBox(width: 8),
-                  Text(
-                    _locationStatus,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
-              ),
+            // LOCATION STATUS
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on,
+                  color: Color(0xFFFF6D00),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _locationMessage,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
 
-            // Description
+            // DESCRIPTION INPUT
             TextField(
-              controller: _descController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: "Describe the issue...",
+              controller: _descriptionController,
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: Translator.t('desc_hint'), // Translated
+                labelText: "Description",
+                alignLabelWithHint: true,
               ),
             ),
             const SizedBox(height: 30),
 
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isUploading ? null : _submitReport,
-                child: _isUploading
-                    ? const Text("ANALYZING...")
-                    : const Text("SUBMIT REPORT"),
+            // SUBMIT BUTTON
+            _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFF6D00)),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: _analyzeAndUpload,
+                    icon: const Icon(Icons.send),
+                    label: Text(Translator.t('submit')), // Translated
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🛠️ FIXED: Bottom Sheet now lifts up safely
+  void _showPickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      isScrollControlled: true, 
+      useSafeArea: true, 
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.only(bottom: 20.0), 
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.white),
+              title: Text(
+                Translator.t('camera'), // Translated
+                style: const TextStyle(color: Colors.white),
               ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.camera);
+              },
             ),
+            const Divider(color: Colors.white10),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.white),
+              title: Text(
+                Translator.t('gallery'), // Translated
+                style: const TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: 40, width: double.infinity),
           ],
         ),
       ),
