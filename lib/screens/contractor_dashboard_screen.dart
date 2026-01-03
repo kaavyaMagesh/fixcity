@@ -15,36 +15,28 @@ class ContractorDashboardScreen extends StatefulWidget {
 class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   bool _isVerifying = false;
 
-  // --- 📸 LOGIC: Capture and AI Verify ---
+  // --- 📸 LOGIC: UNTOUCHED ---
   Future<void> _handleFixUpload(String reportId, dynamic reportData) async {
     final picker = ImagePicker();
 
-    // 1. Capture the new "Fixed" photo
-    // Reduced quality slightly to prevent memory-related app exits on physical devices
     final XFile? photo = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 50, 
     );
 
     if (photo == null) return;
-
-    // Safety check: Ensure widget is still active
     if (!mounted) return;
 
     setState(() => _isVerifying = true);
     
-    // Close the bottom sheet so user sees the loading overlay
     if (Navigator.canPop(context)) Navigator.pop(context);
 
     try {
       Uint8List imageBytes = await photo.readAsBytes();
 
-      // 2. Extract Lat/Lng from the existing report data
-      // This ensures we are verifying the correct location without needing a 'Before' image
       double lat = reportData['location']?['lat'] ?? 0.0;
       double lng = reportData['location']?['lng'] ?? 0.0;
 
-      // 3. Call the simplified Service (Independent Quality Check)
       Map<String, dynamic> result = await ContractorAIService.verifyFix(
         imageBytes: imageBytes,
         latitude: lat,
@@ -57,7 +49,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
       String reason = result['reason'] ?? "AI verification completed.";
 
       if (isFixed) {
-        // 4. Update Firestore: Move to RESOLVED directly
         await FirebaseFirestore.instance.collection('reports').doc(reportId).update({
           'status': 'RESOLVED',
           'aiAnalysis.status': 'VERIFIED BY AI',
@@ -68,12 +59,11 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
 
         _showSnackBar("✅ AI Approved! Task marked as Resolved.", Colors.green);
       } else {
-        // AI rejected the fix based on image quality/location
-        _showSnackBar("❌ AI Refused: $reason", Colors.redAccent);
+        _showSnackBar("❌ AI Refused: $reason", const Color(0xFFF44336)); // Spec Red
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar("Error: AI verification failed. Check connection.", Colors.redAccent);
+        _showSnackBar("Error: AI verification failed. Check connection.", const Color(0xFFF44336));
       }
       debugPrint("Verification Error: $e");
     } finally {
@@ -84,9 +74,10 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   void _showSnackBar(String msg, Color bg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: const TextStyle(color: Colors.white)),
+        content: Text(msg, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: bg,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         duration: const Duration(seconds: 4),
       ),
     );
@@ -97,15 +88,15 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF121212), // Spec: App Background
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E), // Spec: Surface Grey
         title: const Text("Contractor Portal",
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 20)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.orange),
+            icon: const Icon(Icons.logout, color: Color(0xFFFF6D00)), // Spec: Primary Orange
             onPressed: () => FirebaseAuth.instance.signOut(),
           ),
         ],
@@ -117,13 +108,13 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
             children: [
               _buildHeader(user?.email ?? "Contractor"),
               const Padding(
-                padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
+                padding: EdgeInsets.fromLTRB(20, 25, 20, 10),
                 child: Text(
                   "YOUR ACTIVE TASKS",
                   style: TextStyle(
-                      color: Colors.grey,
+                      color: Color(0xFFB3B3B3), // Spec: Body Light Grey
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+                      letterSpacing: 1.5,
                       fontSize: 12),
                 ),
               ),
@@ -136,14 +127,14 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: Colors.orange));
+                      return const Center(child: CircularProgressIndicator(color: Color(0xFFFF6D00)));
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return _buildEmptyState();
                     }
 
                     return ListView.builder(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       itemCount: snapshot.data!.docs.length,
                       itemBuilder: (context, index) {
                         return _buildTaskCard(context, snapshot.data!.docs[index]);
@@ -158,18 +149,18 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
           // --- 🤖 AI PROCESSING OVERLAY ---
           if (_isVerifying)
             Container(
-              color: Colors.black.withOpacity(0.85),
+              color: Colors.black.withOpacity(0.9),
               child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: Colors.orange),
+                    CircularProgressIndicator(color: Color(0xFF00E5FF)), // Spec: AI Cyan
                     SizedBox(height: 25),
-                    Text("Gemini AI is verifying repair...",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text("AI IS VERIFYING FIX",
+                        style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2)),
                     SizedBox(height: 10),
-                    Text("Checking road safety and location coordinates",
-                        style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    Text("Analyzing road safety & GPS metrics",
+                        style: TextStyle(color: Color(0xFFB3B3B3), fontSize: 13)),
                   ],
                 ),
               ),
@@ -181,25 +172,26 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
 
   Widget _buildHeader(String email) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: const BoxDecoration(
-        color: Color(0xFF1E1E1E),
+        color: Color(0xFF1E1E1E), // Spec Surface
         borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
       ),
       child: Row(
         children: [
           const CircleAvatar(
-            backgroundColor: Colors.orange,
-            radius: 25,
-            child: Icon(Icons.engineering, color: Colors.white),
+            backgroundColor: Color(0xFFFF6D00), // Spec Orange
+            radius: 28,
+            child: Icon(Icons.engineering, color: Colors.white, size: 30),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Welcome back,", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const Text("Welcome back,", style: TextStyle(color: Color(0xFFB3B3B3), fontSize: 13)),
+                const SizedBox(height: 4),
                 Text(email,
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis),
@@ -216,9 +208,9 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.assignment_turned_in_outlined, size: 80, color: Colors.grey.withOpacity(0.2)),
+          Icon(Icons.assignment_turned_in_outlined, size: 80, color: const Color(0xFF2C2C2C)),
           const SizedBox(height: 16),
-          const Text("No active work orders.", style: TextStyle(color: Colors.grey, fontSize: 16)),
+          const Text("No active work orders.", style: TextStyle(color: Color(0xFFB3B3B3), fontSize: 16)),
         ],
       ),
     );
@@ -227,30 +219,32 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   Widget _buildTaskCard(BuildContext context, DocumentSnapshot doc) {
     var data = doc.data() as Map<String, dynamic>;
     return Card(
-      color: const Color(0xFF2C2C2C),
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: const Color(0xFF1E1E1E), // Spec Surface
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF333333), width: 1), // Spec thin border
+      ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.network(data['imageUrl'],
-              width: 60, height: 60, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.grey)),
+              width: 65, height: 65, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(color: const Color(0xFF2C2C2C), child: const Icon(Icons.broken_image, color: Colors.grey))),
         ),
         title: Text(data['aiAnalysis']?['issueType'] ?? "Infrastructure Task",
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text("Dept: ${data['department'] ?? 'Municipal'}",
-                style: const TextStyle(color: Colors.grey, fontSize: 12)),
-          ],
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text("Dept: ${data['department'] ?? 'Municipal'}",
+              style: const TextStyle(color: Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.w600)), // Spec Cyan
         ),
-        trailing: const CircleAvatar(
-          backgroundColor: Colors.orange,
-          child: Icon(Icons.camera_alt, color: Colors.white, size: 20),
+        trailing: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: const Color(0xFF2C2C2C), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(Icons.camera_alt, color: Color(0xFFFF6D00), size: 20),
         ),
         onTap: () => _showUploadFixBottomSheet(context, doc),
       ),
@@ -261,34 +255,34 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
     var data = doc.data() as Map<String, dynamic>;
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: const Color(0xFF1E1E1E), // Spec Surface
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.camera_enhance, size: 48, color: Colors.orange),
-            const SizedBox(height: 16),
+            const Icon(Icons.camera_enhance, size: 48, color: Color(0xFFFF6D00)),
+            const SizedBox(height: 20),
             const Text("Verify Completion",
                 style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             const Text(
               "Capture the repaired area. Gemini AI will analyze the road quality and location to close the task.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+              style: TextStyle(color: Color(0xFFB3B3B3), fontSize: 14, height: 1.4),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 32),
             ElevatedButton.icon(
-              // IMPORTANT: Passing 'data' here instead of just the URL
               onPressed: _isVerifying ? null : () => _handleFixUpload(doc.id, data),
               icon: const Icon(Icons.camera_alt),
-              label: Text(_isVerifying ? "VERIFYING..." : "CAPTURE & FINISH"),
+              label: const Text("CAPTURE & FINISH"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+                backgroundColor: const Color(0xFFFF6D00), // Spec Orange
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // Spec Radius 8
+                textStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
               ),
             ),
             const SizedBox(height: 10),
