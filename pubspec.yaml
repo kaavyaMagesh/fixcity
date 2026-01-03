@@ -1,0 +1,59 @@
+name: fixcity
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  carousel_slider: ^5.0.0
+  
+  
+  image_picker: ^1.2.1
+  geolocator: ^14.0.2
+  google_generative_ai: ^0.4.7
+  uuid: ^4.5.2
+  intl: ^0.20.2
+  http: ^1.2.0
+  flutter_dotenv: ^5.1.0
+  flutter_map: ^6.1.0 
+  # Needed for handling Latitude/Longitude coordinates
+  latlong2: ^0.9.0
+  
+  google_sign_in: ^6.1.6
+  shared_preferences: ^2.2.2
+  firebase_core: ^3.10.0      # Core foundation
+  firebase_auth: ^5.3.4       # Matches the storage version
+  firebase_storage: ^12.3.7   # Matches the auth version
+  cloud_firestore: ^5.6.0
+  font_awesome_flutter: ^10.12.0
+  share_plus: ^12.0.1
+  pdf: ^3.11.3
+  printing: ^5.14.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # ✅ FIXED INDENTATION HERE
+  flutter_launcher_icons: ^0.13.1
+  flutter_lints: ^5.0.0
+
+# Configuration for the icons
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app_logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/app_logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/

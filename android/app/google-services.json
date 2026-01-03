@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "134499039686",
+    "project_id": "fixcity-2d13f",
+    "storage_bucket": "fixcity-2d13f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:134499039686:android:abcaaf5b087bf68e745ac7",
+        "android_client_info": {
+          "package_name": "com.example.fixcity"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "134499039686-12g9ud8f8sfj6eovt42l2rd3g6hhd2kp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.fixcity",
+            "certificate_hash": "81bfc2cb28dbd41f6d2092de43a10b54ff9ed8b9"
+          }
+        },
+        {
+          "client_id": "134499039686-6rvrufbpnuhf8raqer6qqgt6ne9u71oh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.fixcity",
+            "certificate_hash": "242cc9afd39f6e97aaf9bbbf02cad261f8ef662b"
+          }
+        },
+        {
+          "client_id": "134499039686-bvslblpl98hm55lpg14gt9bh1iocd943.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDgMKiTb3kGY8qE3oVy86PeNZVouIJW8o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "134499039686-bvslblpl98hm55lpg14gt9bh1iocd943.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
