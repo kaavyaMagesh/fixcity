@@ -268,6 +268,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                             TileLayer(
                               urlTemplate:
                                   'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.codealchemists.fixcity',
                             ),
                             MarkerLayer(
                               markers: [
