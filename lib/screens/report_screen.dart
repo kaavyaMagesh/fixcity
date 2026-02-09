@@ -30,7 +30,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _status = widget.data['aiAnalysis']['status'] ?? 'PENDING';
+    _status = widget.data['aiAnalysis']?['status'] ?? 'PENDING';
   }
 
   // 🖨️ PDF GENERATOR
@@ -67,10 +67,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 "AI ASSESSMENT",
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
               ),
-              pw.Bullet(text: "Issue: ${analysis['issueType']}"),
-              pw.Bullet(text: "Department: ${analysis['department']}"),
-              pw.Bullet(text: "Urgency: ${analysis['urgency']}"),
-              pw.Bullet(text: "Severity: ${analysis['severity']}"),
+              pw.Bullet(text: "Issue: ${analysis['issueType'] ?? 'N/A'}"),
+              pw.Bullet(text: "Department: ${analysis['department'] ?? 'N/A'}"),
+              pw.Bullet(text: "Urgency: ${analysis['urgency'] ?? 'N/A'}"),
+              pw.Bullet(text: "Severity: ${analysis['severity'] ?? 'N/A'}"),
               pw.SizedBox(height: 10),
               pw.Text(
                 "RESOURCE ESTIMATION",
@@ -83,7 +83,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 "LOCATION DATA",
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
               ),
-              pw.Text("Lat: ${loc['lat']}, Lng: ${loc['lng']}"),
+              pw.Text("Lat: ${loc['lat'] ?? 0.0}, Lng: ${loc['lng'] ?? 0.0}"),
               pw.SizedBox(height: 40),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -136,8 +136,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     // ✅ REAL SECURITY CHECK: Only show admin tools if role is 'Admin'
     final bool isAdmin = widget.userRole == 'Admin';
 
-    // ❌ REMOVED: Humanitarian check is gone.
-
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
@@ -167,10 +165,19 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    widget.data['imageUrl'] != ""
+                    (widget.data['imageUrl'] ?? '').toString().isNotEmpty
                         ? Image.network(
                             widget.data['imageUrl'],
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: Colors.grey.shade900,
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                    size: 50,
+                                  ),
+                                ),
                           )
                         : Container(
                             color: Colors.grey.shade900,
@@ -239,8 +246,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     // 4. BUDGET CARD (Admins Only)
                     if (isAdmin) _buildBudgetCard(analysis),
 
-                    // ❌ REMOVED: Humanitarian Alert Card section
-
                     // 5. MAP PREVIEW
                     Text(
                       Translator.t('location_context'),
@@ -261,7 +266,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         borderRadius: BorderRadius.circular(16),
                         child: FlutterMap(
                           options: MapOptions(
-                            initialCenter: LatLng(loc['lat'], loc['lng']),
+                            initialCenter: LatLng(
+                              loc['lat']?.toDouble() ?? 0.0,
+                              loc['lng']?.toDouble() ?? 0.0,
+                            ),
                             initialZoom: 15,
                           ),
                           children: [
@@ -272,7 +280,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                             MarkerLayer(
                               markers: [
                                 Marker(
-                                  point: LatLng(loc['lat'], loc['lng']),
+                                  point: LatLng(
+                                    loc['lat']?.toDouble() ?? 0.0,
+                                    loc['lng']?.toDouble() ?? 0.0,
+                                  ),
                                   child: const Icon(
                                     Icons.location_on,
                                     color: Colors.red,
@@ -286,7 +297,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       ),
                     ),
 
-                    // 6. ADMIN ACTIONS (❌ HIDDEN FOR CITIZENS)
+                    // 6. ADMIN ACTIONS
                     if (isAdmin) ...[
                       const SizedBox(height: 30),
                       const Divider(color: Colors.white24),
@@ -355,6 +366,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   // 📋 AI DETAILS WIDGET
   Widget _buildAnalysisDetails(Map<String, dynamic> analysis) {
+    // Safe parsing for confidence
+    double confidence = 0.0;
+    if (analysis['confidence'] != null) {
+      confidence = double.tryParse(analysis['confidence'].toString()) ?? 0.0;
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -384,7 +401,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           _detailRow("Department", analysis['department'], Colors.white),
           _detailRow(
             "Confidence",
-            "${((analysis['confidence'] ?? 0.0) * 100).toStringAsFixed(0)}%",
+            "${(confidence * 100).toStringAsFixed(0)}%",
             Colors.greenAccent,
           ),
           const SizedBox(height: 10),
@@ -400,7 +417,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     );
   }
 
-  Widget _detailRow(String label, String? value, Color valueColor) {
+  Widget _detailRow(String label, dynamic value, Color valueColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
@@ -410,7 +427,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           const SizedBox(width: 16),
           Expanded(
             child: Text(
-              value?.toUpperCase() ?? "N/A",
+              value?.toString().toUpperCase() ?? "N/A",
               textAlign: TextAlign.end,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -473,7 +490,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               spacing: 6,
               runSpacing: 6,
               children: materials
-                  .map(
+                  .map<Widget>(
                     (item) => Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
